@@ -4,7 +4,7 @@ from typing import Optional
 
 import numpy as np
 
-from src.scibs.utilities.file import read_pts, read_tet, write_el, write_tot, write_tri
+from scibs.utilities.file import read_pts, read_tet, write_el, write_tot, write_tri
 
 
 def tet2tri(tet_pts: np.ndarray, tet_ids: np.ndarray, surface_only: bool = True):

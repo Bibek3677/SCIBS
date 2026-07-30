@@ -1,7 +1,6 @@
-from scibs.scripts.pipeline import pipeline
 from argparse import ArgumentParser
-from src.scibs.scripts import tet2tri, trielec, tetcor
-from functools import partial
+from scibs.scripts import tet2tri, tetcor, trielec
+from scibs.scripts.pipeline import pipeline
 
 parser = ArgumentParser(prog="scibs")
 
@@ -38,7 +37,6 @@ pipeline_parser = subparsers.add_parser("pipeline", description="")
 pipeline_parser.add_argument('file_prefix', help="run the full pipeline")
 pipeline_parser.add_argument('-s', '--struct-name', help="Matlab struct name (i.e. HeadModel, Geometry).", default="Geometry")
 pipeline_parser.set_defaults(func=pipeline)
-
 
 
 args = parser.parse_args()

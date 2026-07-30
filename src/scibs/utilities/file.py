@@ -8,14 +8,28 @@ import scipy.io as sio
 from .mat import is_model
 
 
-def write_mat(file_prefix: str, pts: np.ndarray, ids: np.ndarray, struct_name: str):
+def write_mat(
+    file_prefix: str,
+    pts: np.ndarray,
+    ids: np.ndarray,
+    struct_name: str,
+    potentials: Optional[np.ndarray] = None,
+):
     mat_contents = sio.loadmat(f"{file_prefix}.mat")
-    
+
     if not is_model(mat_contents[struct_name]):
         raise ValueError(f"Struct {struct_name} is not a valid model")
-    
+
     mat_contents[struct_name]['node'][0, 0] = pts
     mat_contents[struct_name]['cell'][0, 0] = ids + 1
+
+    # Persist the per-node surface potentials (electrode ids) alongside the
+    # mesh as a sibling variable, and as a companion `.pot` file in the
+    # original SCIBS binary format.
+    if potentials is not None:
+        potentials = np.asarray(potentials).reshape(-1, 1)
+        mat_contents["electrode_pot"] = potentials
+        write_pot(f"{file_prefix}_E.pot", potentials)
 
     # remove metadata to avoid warnings
     try:

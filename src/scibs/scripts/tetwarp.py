@@ -206,11 +206,11 @@ def main(file_prefix: str):
     tets = read_tet(f"{file_prefix}.tet")
     el_map = read_el(f"{file_prefix}.el") 
     tot_map = read_tot(f"{file_prefix}.tot")
-    pts, tets, history = tetwarp(
-        pts, 
-        el_map, 
-        tot_map, 
-        tets, 
+    pts, tets, history, el_map = tetwarp(
+        pts,
+        el_map,
+        tot_map,
+        tets,
         warp_lines
     )
     write_tetwarp(f"{file_prefix}_test_out.tetwarp", history)
