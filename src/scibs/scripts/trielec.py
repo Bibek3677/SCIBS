@@ -1,10 +1,35 @@
 import argparse
+import os
 from typing import Optional
-
 import numpy as np
-
 from scibs.utilities.file import read_tri, write_pot, write_tri
 from scibs.utilities.graphics import visualize_mesh
+
+
+def load_electrode_file(filepath: str) -> tuple[np.ndarray, np.ndarray]:
+    """Robustly parses electrode text files while skipping variable headers."""
+    valid_rows = []
+    with open(filepath, "r") as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            parts = line.split()
+            # Expecting 5 numbers: [id, x, y, z, radius]
+            if len(parts) == 5:
+                try:
+                    nums = [float(p) for p in parts]
+                    valid_rows.append(nums[1:])  # Keep x, y, z, radius
+                except ValueError:
+                    continue
+
+    if not valid_rows:
+        raise ValueError(f"Could not parse valid electrode data from {filepath}")
+
+    data = np.array(valid_rows)
+    electrode_pts = data[:, :3]
+    electrode_radii = data[:, 3]
+    return electrode_pts, electrode_radii
 
 
 def trielec(verts: np.ndarray, faces: np.ndarray, electrode_pts: np.ndarray, electrode_radii: np.ndarray):
@@ -25,7 +50,14 @@ def trielec(verts: np.ndarray, faces: np.ndarray, electrode_pts: np.ndarray, ele
     moved_nodes = set()
 
     for el_idx, (center, radius) in enumerate(zip(electrode_pts, electrode_radii)):
+        print(f"\n--- Processing electrode {el_idx} ---")
+        print(f"Center: [{center[0]:.6f} {center[1]:.6f} {center[2]:.6f}]")
+        print(f"Radius: {radius}")
+        print("Calculating vertex distances...")
+
         dists = np.linalg.norm(verts - center, axis=1) - radius
+        print(f"Distances calculated. Shape: {dists.shape}")
+        print("Edge distances calculated")
 
         d1 = dists[unique_edges[:, 0]]
         d2 = dists[unique_edges[:, 1]]
@@ -37,9 +69,14 @@ def trielec(verts: np.ndarray, faces: np.ndarray, electrode_pts: np.ndarray, ele
         crossing_d1 = d1[crossings]
         crossing_d2 = d2[crossings]
 
+        num_crossings = len(crossing_edges)
+        print(f"Crossing edges: {num_crossings}")
+        print(f"Processing {num_crossings} crossing edges...")
+        if num_crossings > 0:
+            print(f"  Crossing edge 0/{num_crossings}")
+
         # SLIVER PREVENTION (Epsilon Snapping)
         # Matches the MINLM2 = 0.15 threshold from the original C++ code.
-        # If the cut is within 15% of an existing vertex, snap the vertex instead of splitting.
         eps = 0.15 
 
         for i, (vA, vB) in enumerate(crossing_edges):
@@ -54,23 +91,31 @@ def trielec(verts: np.ndarray, faces: np.ndarray, electrode_pts: np.ndarray, ele
                     verts_list[vA] = p_new_calc.tolist()
                     warp_lines.append(f"m {vA} {p_new_calc[0]:.15g} {p_new_calc[1]:.15g} {p_new_calc[2]:.15g}")
                     moved_nodes.add(vA)
-                # By skipping the split, the edge naturally terminates at the snapped boundary
             elif t > 1.0 - eps:
                 if vB not in moved_nodes:
                     verts_list[vB] = p_new_calc.tolist()
                     warp_lines.append(f"m {vB} {p_new_calc[0]:.15g} {p_new_calc[1]:.15g} {p_new_calc[2]:.15g}")
                     moved_nodes.add(vB)
-                # By skipping the split, the edge naturally terminates at the snapped boundary
             else:
                 new_idx = len(verts_list)
                 verts_list.append(p_new_calc.tolist())
                 edge_to_new_v[(vA, vB)] = new_idx
                 warp_lines.append(f"a {new_idx} {p_new_calc[0]:.15g} {p_new_calc[1]:.15g} {p_new_calc[2]:.15g}")
 
+        print(f"Finished electrode {el_idx}")
+        print(f"Total new vertices so far: {len(edge_to_new_v)}")
+
     # --- PHASE 2: Isolated Deterministic Face Bisection ---
     num_original_faces = len(faces)
-    
+    print("\n=== PHASE 2: FACE BISECTION ===")
+    print(f"what is this: {num_original_faces}")
+    print(f"Original faces: {num_original_faces}")
+    print(f"Edges with new vertices: {len(edge_to_new_v)}")
+
     for i in range(num_original_faces):
+        if i == 0 or i == 10000:
+            print(f"Processing face {i}/{num_original_faces}")
+
         face = faces[i]
         v0, v1, v2 = face
         edges_of_face = [
@@ -117,18 +162,29 @@ def trielec(verts: np.ndarray, faces: np.ndarray, electrode_pts: np.ndarray, ele
                     face_queue.append((new_f_idx, t2))
                     break
 
+    print("phase 2 ends here **__**__")
+    print(f"total faces: {len(faces_list)}")
+
     # --- PHASE 3: Vectorized Post-Topology Centroid Labeling ---
+    print("\n centroid labeling third phase")
     final_verts = np.array(verts_list)
     final_faces = np.array(faces_list)
+    print(f"Final vertices: {final_verts.shape}")
+    print(f"Final faces: {final_faces.shape}")
+
     face_labels = np.full(len(final_faces), -1, dtype=np.int32)
 
+    centroids = final_verts[final_faces].mean(axis=1)
+    print(f"Centroids calculated: {centroids.shape}")
+
     for el_idx, (center, radius) in enumerate(zip(electrode_pts, electrode_radii)):
-        centroids = final_verts[final_faces].mean(axis=1)
+        print(f"Labeling electrode {el_idx}")
         dists = np.linalg.norm(centroids - center, axis=1)
         
         # 1. Candidate faces
         inside_mask = dists < (radius + 1e-5)
         candidate_indices = np.where(inside_mask)[0]
+        print(f"Candidate faces: {len(candidate_indices)}")
         
         if len(candidate_indices) == 0:
             continue
@@ -143,8 +199,11 @@ def trielec(verts: np.ndarray, faces: np.ndarray, electrode_pts: np.ndarray, ele
                     edge_to_faces[edge] = []
                 edge_to_faces[edge].append(f_idx)
 
+        print(f"Adjacency edges: {len(edge_to_faces)}")
+
         # 3. Seed Identification
         seed_idx = candidate_indices[np.argmin(dists[inside_mask])]
+        print(f"Seed face: {seed_idx}")
 
         # 4. Region-Grow (BFS)
         visited = set([seed_idx])
@@ -161,26 +220,42 @@ def trielec(verts: np.ndarray, faces: np.ndarray, electrode_pts: np.ndarray, ele
                         visited.add(neighbor_idx)
                         queue.append(neighbor_idx)
 
+        print(f"Region size: {len(visited)} faces")
+
         # 5. Label Assignment
         for f_idx in visited:
             face_labels[f_idx] = el_idx
+
+    labeled_count = np.sum(face_labels != -1)
+    print("\n=== TRIELEC FINISHED ===")
+    print(f"Final vertices: {len(final_verts)}")
+    print(f"Final faces: {len(final_faces)}")
+    print(f"Warp commands: {len(warp_lines)}")
+    print(f"Labeled faces: {labeled_count}")
+
+    # Force direct extraction dump to C:\S.R\SCIBS\extraction.txt during function execution
+    extraction_path = r"C:\S.R\SCIBS\extraction.txt"
+    print(f"Dumping extraction data directly to: {extraction_path}")
+    with open(extraction_path, "w") as f:
+        f.write("=== FINAL VERTICES ===\n")
+        np.savetxt(f, final_verts, fmt="%.15g")
+
+        f.write("\n=== FINAL FACES ===\n")
+        np.savetxt(f, final_faces, fmt="%d")
+
+        f.write("\n=== FACE LABELS ===\n")
+        np.savetxt(f, face_labels.reshape(-1, 1), fmt="%d")
+
+        f.write("\n=== WARP LINES ===\n")
+        for line in warp_lines:
+            f.write(line + "\n")
 
     return final_verts, final_faces, face_labels, warp_lines
 
 
 def main(elec_descr_in: str, tri_in: str, tri_out: str, warp_name: Optional[str] = None, plot: bool = False):
     tri_verts, tri_ids = read_tri(tri_in)
-
-    electrode = np.loadtxt(
-        elec_descr_in,
-        skiprows=1,
-        usecols=(1, 2, 3, 4),
-        ndmin=2,
-        comments=["height", "n layers"],
-    )
-
-    electrode_pts, electrode_radii = np.split(electrode, [3], axis=1)
-    electrode_radii = electrode_radii.flatten()
+    electrode_pts, electrode_radii = load_electrode_file(elec_descr_in)
 
     tri_verts, tri_ids, face_labels, warp_lines = trielec(
         tri_verts, tri_ids, electrode_pts, electrode_radii
@@ -194,3 +269,21 @@ def main(elec_descr_in: str, tri_in: str, tri_out: str, warp_name: Optional[str]
 
     if plot:
         visualize_mesh(tri_verts, tri_ids, face_labels, electrode_pts)
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Imprint electrode geometry onto surface mesh.")
+    parser.add_argument("elec_descr_in", type=str, help="Path to electrode description file")
+    parser.add_argument("tri_in", type=str, help="Path to input .tri surface mesh")
+    parser.add_argument("tri_out", type=str, help="Path for output .tri surface mesh")
+    parser.add_argument("--warp_name", type=str, default=None, help="Path to output .warp file")
+    parser.add_argument("--plot", "-p", action="store_true", help="Plot interactive 3D mesh")
+
+    args = parser.parse_args()
+    main(
+        elec_descr_in=args.elec_descr_in,
+        tri_in=args.tri_in,
+        tri_out=args.tri_out,
+        warp_name=args.warp_name,
+        plot=args.plot
+    )

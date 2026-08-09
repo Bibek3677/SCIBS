@@ -1,11 +1,8 @@
 from argparse import ArgumentParser
 from functools import partial
 from typing import Optional
-
 import numpy as np
-
 from scibs.utilities.file import read_pts, read_tet, write_el, write_tot, write_tri
-
 
 def tet2tri(tet_pts: np.ndarray, tet_ids: np.ndarray, surface_only: bool = True):
     # extract the 4 faces for each tetrahedron.
@@ -61,7 +58,6 @@ def tet2tri(tet_pts: np.ndarray, tet_ids: np.ndarray, surface_only: bool = True)
         tri_ids = faces
 
     return tri_ids, tet_pts, el, tot
-    
 
 def main(pts_name: str, tet_name: Optional[str] = None, tri_name: Optional[str] = None, el_name: Optional[str] = None, tot_name: Optional[str] = None, surface_only: bool = True, verbose: bool = False):
     opt_kwargs = [tet_name, tri_name, el_name, tot_name]
