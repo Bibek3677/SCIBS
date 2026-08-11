@@ -46,11 +46,35 @@ def trielec(verts: np.ndarray, faces: np.ndarray, electrode_pts: np.ndarray, ele
     edges = np.sort(edges, axis=1)
     unique_edges = np.unique(edges, axis=0)
 
+    # DEGENERATE VERTEX GUARD
+    # A single corrupted/outlier vertex (e.g. a placeholder coordinate baked into
+    # the source mesh) creates edges dozens of times longer than the rest of the
+    # mesh. Treating those as legitimate electrode-boundary crossings makes the
+    # sliver-prevention snap below drag real scalp vertices toward the bad point,
+    # punching holes in otherwise round electrodes. Drop such edges from crossing
+    # detection entirely so a corrupted vertex can't distort its real neighbors.
+    edge_lengths = np.linalg.norm(verts[unique_edges[:, 0]] - verts[unique_edges[:, 1]], axis=1)
+    median_edge_len = np.median(edge_lengths)
+    degenerate_mask = edge_lengths > 20 * median_edge_len
+    if degenerate_mask.any():
+        # The corrupted vertex is the one shared by every bad edge (its neighbors
+        # each show up on only one bad edge, since only their shared edge with the
+        # corrupted vertex is abnormally long).
+        touched, counts = np.unique(unique_edges[degenerate_mask].flatten(), return_counts=True)
+        hub_verts = touched[counts > 1].tolist()
+        print(
+            f"WARNING: Ignoring {degenerate_mask.sum()} degenerate mesh edge(s) "
+            f"(>20x the median edge length of {median_edge_len:.4f}). "
+            f"This usually means the input mesh has corrupted vertex position(s) "
+            f"-- check vertex indices {hub_verts} in the source .tri file."
+        )
+        unique_edges = unique_edges[~degenerate_mask]
+
     edge_to_new_v = {}
     moved_nodes = set()
 
     for el_idx, (center, radius) in enumerate(zip(electrode_pts, electrode_radii)):
-        print(f"\n--- Processing electrode {el_idx} ---")
+        print(f"\n--- Processing electrode {el_idx + 1} ---")
         print(f"Center: [{center[0]:.6f} {center[1]:.6f} {center[2]:.6f}]")
         print(f"Radius: {radius}")
         print("Calculating vertex distances...")
@@ -102,7 +126,7 @@ def trielec(verts: np.ndarray, faces: np.ndarray, electrode_pts: np.ndarray, ele
                 edge_to_new_v[(vA, vB)] = new_idx
                 warp_lines.append(f"a {new_idx} {p_new_calc[0]:.15g} {p_new_calc[1]:.15g} {p_new_calc[2]:.15g}")
 
-        print(f"Finished electrode {el_idx}")
+        print(f"Finished electrode {el_idx + 1}")
         print(f"Total new vertices so far: {len(edge_to_new_v)}")
 
     # --- PHASE 2: Isolated Deterministic Face Bisection ---
@@ -178,11 +202,19 @@ def trielec(verts: np.ndarray, faces: np.ndarray, electrode_pts: np.ndarray, ele
     print(f"Centroids calculated: {centroids.shape}")
 
     for el_idx, (center, radius) in enumerate(zip(electrode_pts, electrode_radii)):
-        print(f"Labeling electrode {el_idx}")
+        electrode_label = el_idx + 1
+        print(f"Labeling electrode {electrode_label}")
         dists = np.linalg.norm(centroids - center, axis=1)
-        
+
         # 1. Candidate faces
-        inside_mask = dists < (radius + 1e-5)
+        # Phase 1/2 already cut every boundary-crossing edge exactly at the
+        # sphere, so a correctly-split face should never straddle it. Checking
+        # the CENTROID distance instead of every vertex lets a triangle with one
+        # genuinely-outside vertex sneak in whenever the other two vertices sit
+        # close enough to the boundary to pull the average back under the
+        # threshold -- that produces a thin spike poking out of the disc.
+        vert_dists = np.linalg.norm(final_verts - center, axis=1)
+        inside_mask = np.all(vert_dists[final_faces] < (radius + 1e-5), axis=1)
         candidate_indices = np.where(inside_mask)[0]
         print(f"Candidate faces: {len(candidate_indices)}")
         
@@ -224,7 +256,7 @@ def trielec(verts: np.ndarray, faces: np.ndarray, electrode_pts: np.ndarray, ele
 
         # 5. Label Assignment
         for f_idx in visited:
-            face_labels[f_idx] = el_idx
+            face_labels[f_idx] = electrode_label
 
     labeled_count = np.sum(face_labels != -1)
     print("\n=== TRIELEC FINISHED ===")

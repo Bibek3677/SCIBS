@@ -1,5 +1,4 @@
 from time import time
-
 # Imports from individual script files
 from scibs.scripts.elecpatch import elecpatch
 from scibs.scripts.elecpotsurf import elecpotsurf
