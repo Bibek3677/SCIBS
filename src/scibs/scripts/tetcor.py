@@ -53,6 +53,19 @@ def tetcor(pts: np.ndarray, ids: np.ndarray) -> tuple[np.ndarray, int]:
         ids[negative_ids, 2] = ids[negative_ids, 3]
         ids[negative_ids, 3] = temp
 
+    # Force direct extraction dump to C:\S.R\SCIBS\extraction_tetcor.txt during function execution
+    extraction_path = r"C:\S.R\SCIBS\extraction_tetcor.txt"
+    print(f"Dumping extraction data directly to: {extraction_path}")
+    with open(extraction_path, "w") as f:
+        f.write("=== CORRECTED TET IDS ===\n")
+        np.savetxt(f, ids, fmt="%d")
+
+        f.write("\n=== N_CORRECTED ===\n")
+        f.write(f"{n_corrected}\n")
+
+        f.write("\n=== CORRECTED TET INDICES ===\n")
+        np.savetxt(f, negative_ids.reshape(-1, 1), fmt="%d")
+
     return ids, n_corrected
 
 

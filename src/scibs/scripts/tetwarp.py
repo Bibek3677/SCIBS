@@ -194,8 +194,29 @@ def tetwarp(pts, el_map, tot_map, tets, warp_lines: list[str]):
         
         func(*args)
         count += 1
-            
-    return np.array(pts), np.array(tets), tet_warp_history, np.array(el_map)
+
+    final_pts = np.array(pts)
+    final_tets = np.array(tets)
+    final_el_map = np.array(el_map)
+
+    # Force direct extraction dump to C:\S.R\SCIBS\extraction_tetwarp.txt during function execution
+    extraction_path = r"C:\S.R\SCIBS\extraction_tetwarp.txt"
+    print(f"Dumping extraction data directly to: {extraction_path}")
+    with open(extraction_path, "w") as f:
+        f.write("=== FINAL POINTS ===\n")
+        np.savetxt(f, final_pts, fmt="%.15g")
+
+        f.write("\n=== FINAL TETS ===\n")
+        np.savetxt(f, final_tets, fmt="%d")
+
+        f.write("\n=== EL_MAP ===\n")
+        np.savetxt(f, final_el_map.reshape(-1, 1), fmt="%d")
+
+        f.write("\n=== TET_WARP_HISTORY ===\n")
+        for entry in tet_warp_history:
+            f.write(" ".join(str(v) for v in entry) + "\n")
+
+    return final_pts, final_tets, tet_warp_history, final_el_map
 
 
 def main(file_prefix: str):

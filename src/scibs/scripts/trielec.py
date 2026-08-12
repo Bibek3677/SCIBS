@@ -265,8 +265,8 @@ def trielec(verts: np.ndarray, faces: np.ndarray, electrode_pts: np.ndarray, ele
     print(f"Warp commands: {len(warp_lines)}")
     print(f"Labeled faces: {labeled_count}")
 
-    # Force direct extraction dump to C:\S.R\SCIBS\extraction.txt during function execution
-    extraction_path = r"C:\S.R\SCIBS\extraction.txt"
+    # Force direct extraction dump to C:\S.R\SCIBS\extraction_trielec.txt during function execution
+    extraction_path = r"C:\S.R\SCIBS\extraction_trielec.txt"
     print(f"Dumping extraction data directly to: {extraction_path}")
     with open(extraction_path, "w") as f:
         f.write("=== FINAL VERTICES ===\n")

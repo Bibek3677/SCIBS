@@ -72,4 +72,12 @@ def elecpotsurf(
         )
 
     pots[flat_nodes[in_range]] = labels[in_range]
+
+    # Force direct extraction dump to C:\S.R\SCIBS\extraction_elecpotsurf.txt during function execution
+    extraction_path = r"C:\S.R\SCIBS\extraction_elecpotsurf.txt"
+    print(f"Dumping extraction data directly to: {extraction_path}")
+    with open(extraction_path, "w") as f:
+        f.write("=== NODE POTENTIALS (electrode id per volumetric node) ===\n")
+        np.savetxt(f, pots.reshape(-1, 1), fmt="%d")
+
     return pots

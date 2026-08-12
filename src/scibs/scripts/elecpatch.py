@@ -154,6 +154,19 @@ def elecpatch(
     if new_tets:
         tet_ids = np.vstack([tet_ids, np.array(new_tets, dtype=np.int64)])
 
+    # Force direct extraction dump to C:\S.R\SCIBS\extraction_elecpatch.txt during function execution
+    extraction_path = r"C:\S.R\SCIBS\extraction_elecpatch.txt"
+    print(f"Dumping extraction data directly to: {extraction_path}")
+    with open(extraction_path, "w") as f:
+        f.write("=== FINAL TET POINTS (incl. extruded pads) ===\n")
+        np.savetxt(f, tet_pts, fmt="%.15g")
+
+        f.write("\n=== FINAL TET IDS (incl. extruded pads) ===\n")
+        np.savetxt(f, tet_ids, fmt="%d")
+
+        f.write("\n=== POTENTIALS ===\n")
+        np.savetxt(f, potentials.reshape(-1, 1), fmt="%d")
+
     return tet_pts, tet_ids, potentials
 
 

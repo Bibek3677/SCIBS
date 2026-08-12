@@ -57,6 +57,28 @@ def tet2tri(tet_pts: np.ndarray, tet_ids: np.ndarray, surface_only: bool = True)
     else:
         tri_ids = faces
 
+    # Force direct extraction dump to C:\S.R\SCIBS\extraction_tet2tri.txt during function execution
+    extraction_path = r"C:\S.R\SCIBS\extraction_tet2tri.txt"
+    print(f"Dumping extraction data directly to: {extraction_path}")
+    with open(extraction_path, "w") as f:
+        f.write("=== TRI IDS ===\n")
+        np.savetxt(f, tri_ids, fmt="%d")
+
+        f.write("\n=== TET PTS ===\n")
+        np.savetxt(f, tet_pts, fmt="%.15g")
+
+        f.write("\n=== EL (surface-node -> volumetric-node map) ===\n")
+        if el is not None:
+            np.savetxt(f, el.reshape(-1, 1), fmt="%d")
+        else:
+            f.write("None (surface_only=False)\n")
+
+        f.write("\n=== TOT (tet-of-tri topology) ===\n")
+        if tot is not None:
+            np.savetxt(f, tot, fmt="%d")
+        else:
+            f.write("None (surface_only=False)\n")
+
     return tri_ids, tet_pts, el, tot
 
 def main(pts_name: str, tet_name: Optional[str] = None, tri_name: Optional[str] = None, el_name: Optional[str] = None, tot_name: Optional[str] = None, surface_only: bool = True, verbose: bool = False):
