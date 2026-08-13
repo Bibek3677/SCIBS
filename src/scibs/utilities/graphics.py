@@ -49,6 +49,20 @@ def visualize_mesh(verts: np.ndarray, faces: np.ndarray, face_labels: np.ndarray
             label="Electrode Centers"
         )
 
+        # Electrode ids are 1-indexed (see trielec.py's face_labels), so label
+        # point i with i + 1 to match what's shown in the Electrode_ID scalar bar.
+        electrode_ids = [str(i + 1) for i in range(len(electrode_pts))]
+        plotter.add_point_labels(
+            electrode_pts,
+            electrode_ids,
+            font_size=14,
+            text_color="white",
+            shape_color="black",
+            shape_opacity=0.6,
+            always_visible=True,
+            show_points=False,
+        )
+
     plotter.add_legend()
     plotter.show()
 
@@ -105,6 +119,22 @@ def visualize_potentials(vertices: np.ndarray, tets: np.ndarray, potentials: np.
         nan_opacity=1.0,    # Make the non-electrode scalp transparent
         show_scalar_bar=True
     )
+
+    # Label each electrode at the centroid of its potential-carrying nodes
+    # (base scalp nodes + any extruded pad nodes from elecpatch).
+    electrode_ids = np.unique(potentials[potentials != -1])
+    if len(electrode_ids) > 0:
+        label_pts = np.array([vertices[potentials == eid].mean(axis=0) for eid in electrode_ids])
+        plotter.add_point_labels(
+            label_pts,
+            [str(int(eid)) for eid in electrode_ids],
+            font_size=14,
+            text_color="white",
+            shape_color="black",
+            shape_opacity=0.6,
+            always_visible=True,
+            show_points=False,
+        )
 
     plotter.show()
 
