@@ -23,6 +23,18 @@ trielec_parser.add_argument("elec_descr_in", help="Electrode description text fi
 trielec_parser.add_argument("tri_out", help="Output triangulated surface file (.tri)")
 trielec_parser.add_argument("--plot", action="store_true", help="Render a 3D visualization of the subdivided mesh")
 trielec_parser.add_argument("-w", "--warp_name", default="", help="Record changes in a warp file (legacy flag)")
+trielec_parser.add_argument(
+    "--clean-slivers", action="store_true",
+    help="Collapse sliver triangles left by the electrode cuts, without moving the "
+         "electrode boundary itself. Safe to combine with -w/--warp_name for the "
+         "volumetric pipeline."
+)
+trielec_parser.add_argument(
+    "--min-electrode-gap", type=float, default=None,
+    help="Extra minimum center-to-center gap (mm) required between any two electrode "
+         "spheres, layered on top of the always-on exact mesh-edge check. Unset by "
+         "default (the exact check alone is the real correctness requirement)."
+)
 trielec_parser.set_defaults(func=trielec.main)
 
 # tetcor.py #
@@ -36,6 +48,17 @@ tetcor_parser.set_defaults(func=tetcor.main)
 pipeline_parser = subparsers.add_parser("pipeline", description="")
 pipeline_parser.add_argument('file_prefix', help="run the full pipeline")
 pipeline_parser.add_argument('-s', '--struct-name', help="Matlab struct name (i.e. HeadModel, Geometry).", default="Geometry")
+pipeline_parser.add_argument(
+    "--clean-slivers", action="store_true",
+    help="Collapse sliver triangles left by the electrode cuts before warping them into the "
+         "volumetric mesh, without moving the electrode boundary itself."
+)
+pipeline_parser.add_argument(
+    "--min-electrode-gap", type=float, default=None,
+    help="Extra minimum center-to-center gap (mm) required between any two electrode "
+         "spheres, layered on top of the always-on exact mesh-edge check. Unset by "
+         "default (the exact check alone is the real correctness requirement)."
+)
 pipeline_parser.set_defaults(func=pipeline)
 
 
